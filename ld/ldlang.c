@@ -140,7 +140,7 @@ stat_alloc (size_t size)
   return obstack_alloc (&stat_obstack, size);
 }
 
-static int
+inline __attribute__((always_inline)) static int
 name_match (const char *pattern, const char *name)
 {
   if (wildcardp (pattern))
@@ -366,14 +366,16 @@ is_simple_wild (const char *name)
   return len >= 4 && name[len] == '*' && name[len + 1] == '\0';
 }
 
-static bfd_boolean
+inline __attribute__((always_inline)) static bfd_boolean
 match_simple_wild (const char *pattern, const char *name)
 {
   /* The first four characters of the pattern are guaranteed valid
      non-wildcard characters.  So we can go faster.  */
-  if (pattern[0] != name[0] || pattern[1] != name[1]
-      || pattern[2] != name[2] || pattern[3] != name[3])
+  const int* a = (const int*)pattern;
+  const int* b = (const int*)name;
+  if (*a != *b) {
     return FALSE;
+  }
 
   pattern += 4;
   name += 4;
@@ -6779,77 +6781,6 @@ lang_reset_memory_regions (void)
     }
 }
 
-/* Worker for lang_gc_sections_1.  */
-
-static void
-gc_section_callback (lang_wild_statement_type *ptr,
-		     struct wildcard_list *sec ATTRIBUTE_UNUSED,
-		     asection *section,
-		     struct flag_info *sflag_info ATTRIBUTE_UNUSED,
-		     lang_input_statement_type *file ATTRIBUTE_UNUSED,
-		     void *data ATTRIBUTE_UNUSED)
-{
-  /* If the wild pattern was marked KEEP, the member sections
-     should be as well.  */
-  if (ptr->keep_sections)
-    section->flags |= SEC_KEEP;
-}
-
-/* Iterate over sections marking them against GC.  */
-
-static void
-lang_gc_sections_1 (lang_statement_union_type *s)
-{
-  for (; s != NULL; s = s->header.next)
-    {
-      switch (s->header.type)
-	{
-	case lang_wild_statement_enum:
-	  walk_wild (&s->wild_statement, gc_section_callback, NULL);
-	  break;
-	case lang_constructors_statement_enum:
-	  lang_gc_sections_1 (constructor_list.head);
-	  break;
-	case lang_output_section_statement_enum:
-	  lang_gc_sections_1 (s->output_section_statement.children.head);
-	  break;
-	case lang_group_statement_enum:
-	  lang_gc_sections_1 (s->group_statement.children.head);
-	  break;
-	default:
-	  break;
-	}
-    }
-}
-
-static void
-lang_gc_sections (void)
-{
-  /* Keep all sections so marked in the link script.  */
-  lang_gc_sections_1 (statement_list.head);
-
-  /* SEC_EXCLUDE is ignored when doing a relocatable link, except in
-     the special case of debug info.  (See bfd/stabs.c)
-     Twiddle the flag here, to simplify later linker code.  */
-  if (bfd_link_relocatable (&link_info))
-    {
-      LANG_FOR_EACH_INPUT_STATEMENT (f)
-	{
-	  asection *sec;
-#ifdef ENABLE_PLUGINS
-	  if (f->flags.claimed)
-	    continue;
-#endif
-	  for (sec = f->the_bfd->sections; sec != NULL; sec = sec->next)
-	    if ((sec->flags & SEC_DEBUGGING) == 0)
-	      sec->flags &= ~SEC_EXCLUDE;
-	}
-    }
-
-  if (link_info.gc_sections)
-    bfd_gc_sections (link_info.output_bfd, &link_info);
-}
-
 /* Worker for lang_find_relro_sections_1.  */
 
 static void
@@ -7331,7 +7262,7 @@ lang_process (void)
   lang_common ();
 
   /* Remove unreferenced sections if asked to.  */
-  lang_gc_sections ();
+  //lang_gc_sections ();
 
   /* Check relocations.  */
   lang_check_relocs ();
